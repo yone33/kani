@@ -26,6 +26,7 @@ function stockLink(code) {
   return `<a class="stock" href="#stock/${code}">${esc(name)}</a>${name === code ? '' : ` <small>${code}</small>`}`;
 }
 function badge(value) {
+  if (value !== 'NISA' && value !== '一部NISA') return '';
   return `<span class="badge ${value === 'NISA' ? 'nisa' : value === '一部NISA' ? 'mixed' : ''}">${esc(value)}</span>`;
 }
 function safeLink(url, name) {
@@ -63,8 +64,8 @@ function portfolio() {
     const value = data?.price == null ? null : data.price * shares;
     const gain = value == null ? null : value - cost;
     const forecast = data?.forecast == null ? null : data.forecast * shares;
-    const states = new Set(open.map(lot => lot.nisa));
-    const nisa = states.size === 1 ? open[0].nisa : states.has('NISA') ? '一部NISA' : '一部未判定';
+    const nisaLots = open.filter(lot => lot.nisa === 'NISA').length;
+    const nisa = nisaLots === open.length ? 'NISA' : nisaLots ? '一部NISA' : '';
     holdings.push({ code, shares, cost, value, gain, forecast, nisa, rate: gain == null ? null : gain / cost, data });
   }
   return { groups, holdings, dividends, sold: trades.filter(t => t.sellDate).sort(byNewest('sellDate')) };
@@ -85,6 +86,31 @@ function dividendTotal(groups, rows) {
   return null;
 }
 
+function latestPriceTime(holdings) {
+  const date = today();
+  const year = Number(date.slice(0, 4));
+  let latest = '', latestKey = '';
+  for (const holding of holdings) {
+    const asOf = holding.data?.asOf;
+    if (holding.data?.price == null || !asOf) continue;
+    const match = /^(?:(?:(\d{4})[/-])?(\d{1,2})[/-](\d{1,2}))?(?:\s*(\d{1,2}):(\d{2}))?$/.exec(asOf.trim());
+    let key = '';
+    if (match && (match[2] || match[4])) {
+      const [, sourceYear, month, day, hour, minute] = match;
+      const pad = part => part.padStart(2, '0');
+      const monthDay = month ? `${pad(month)}-${pad(day)}` : '';
+      const quoteYear = sourceYear ?? (monthDay > date.slice(5) ? year - 1 : year);
+      const quoteDate = monthDay ? `${quoteYear}-${monthDay}` : date;
+      key = `${quoteDate}T${pad(hour ?? '0')}:${minute ?? '00'}`;
+    }
+    if (!latest || key > latestKey) {
+      latest = asOf;
+      latestKey = key;
+    }
+  }
+  return latest || '—';
+}
+
 function home({ holdings, groups, sold, dividends }) {
   const gain = availableTotal(holdings, 'gain');
   const cost = sum(holdings, h => h.cost);
@@ -95,9 +121,9 @@ function home({ holdings, groups, sold, dividends }) {
   const issues = [coverage(holdings, 'gain'), dividendCoverage(groups)].filter(Boolean);
   const ordered = [...holdings].sort((a,b) => (b[sort] ?? -Infinity) - (a[sort] ?? -Infinity) || a.code.localeCompare(b.code));
   const rows = ordered.map(h => [stockLink(h.code), badge(h.nisa), digits.format(h.shares), yen(h.cost),
-    h.data?.price == null ? '—' : `${yen(h.data.price)} <small>${esc(h.data.asOf || '—')}</small>`,
+    yen(h.data?.price),
     yen(h.value), `<b class="${tone(h.gain)}">${yen(h.gain)}</b>`, `<b class="${tone(h.rate)}">${percent(h.rate)}</b>`]);
-  return `<div class="summary">
+  return `${imported ? `<p class="muted price-time">株価の最新表示時点 ${esc(latestPriceTime(holdings))}</p>` : ''}<div class="summary">
     <div class="metric"><span>保有株の取得金額</span><b>${imported ? yen(cost) : '—'}</b><small>${holdings.length} 銘柄</small></div>
     <div class="metric"><span>保有株の評価損益</span><b class="${tone(gain)}">${imported ? yen(gain) : '—'}</b><small>上昇率 ${percent(pricedCost ? gain / pricedCost : null)}</small></div>
   </div>
@@ -108,8 +134,8 @@ function home({ holdings, groups, sold, dividends }) {
     <div class="total"><span>総運用損益（配当込み）</span><strong>${imported ? yen(total) : '—'}</strong></div>
   </section>
   ${issues.length ? `<p class="notice warning">総運用損益は取得済みの項目による集計です。 ${issues.join('。 ')}</p>` : ''}
-  <section class="panel"><div class="section-head"><h2>保有銘柄</h2><div><label for="sort" class="muted">並び替え </label><select id="sort"><option value="gain"${sort === 'gain' ? ' selected' : ''}>評価損益</option><option value="rate"${sort === 'rate' ? ' selected' : ''}>上昇率</option></select> <a class="button" href="#sales">過去一覧を開く</a></div></div>
-    ${imported ? table(['銘柄','NISA','株数','取得金額','株価・表示時点','評価額','評価損益','上昇率'],rows,'現在保有している銘柄はありません。') : '<div class="empty"><p>取引CSVを読み込むと、保有銘柄と損益が表示されます。</p><button class="primary" data-pick>取引CSVを読み込む</button></div>'}</section>`;
+  <section class="panel"><div class="section-head"><h2>保有銘柄</h2><div><label for="sort" class="muted">並び替え </label><select id="sort"><option value="gain"${sort === 'gain' ? ' selected' : ''}>評価損益</option><option value="rate"${sort === 'rate' ? ' selected' : ''}>上昇率</option><option value="value"${sort === 'value' ? ' selected' : ''}>評価額</option></select> <a class="button" href="#sales">過去一覧を開く</a></div></div>
+    ${imported ? table(['銘柄','NISA','株数','取得金額','株価','評価額','評価損益','上昇率'],rows,'現在保有している銘柄はありません。') : '<div class="empty"><p>取引CSVを読み込むと、保有銘柄と損益が表示されます。</p><button class="primary" data-pick>取引CSVを読み込む</button></div>'}</section>`;
 }
 
 function chart(title, rows, key, id, reference = '') {
