@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KANI | 株式ポートフォリオ</title>
+<link rel="stylesheet" href="/style.css">
+<script type="module" src="/app.js"></script>
+</head>
+<body>
+<header class="top"><div class="frame bar">
+  <a class="brand" href="#home"><span class="mark" aria-hidden="true">▥</span> KANI <small>株式ポートフォリオ</small></a>
+  <details id="csv"><summary>CSV ▾</summary><div class="menu">
+    <button id="pick">取引CSVを読み込む</button>
+    <a href="/template.csv" download>テンプレート</a><a href="/example.csv" download>記入例</a>
+  </div></details>
+  <input id="file" type="file" accept=".csv,text/csv" hidden>
+</div></header>
+<div class="nav"><nav class="frame" aria-label="画面切替">
+  <a href="#home">運用状況</a><a href="#allocation">構成</a><a href="#sales">過去一覧</a><a href="#dividends">過去受取配当</a>
+</nav></div>
+<main class="frame">
+  <div id="import-status" role="status"></div>
+  <div id="view"></div>
+</main>
+<footer class="frame">市場データ提供元 <a href="https://finance.yahoo.co.jp/" target="_blank" rel="noopener noreferrer">Yahoo!ファイナンス</a></footer>
+</body>
+</html>
