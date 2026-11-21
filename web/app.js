@@ -16,7 +16,7 @@ const palette = ['#245bab','#008272','#bb6332','#754fa1','#0085ad','#ad456b','#4
 const storageKey = 'kani-manual-dividends-v1';
 let manual = {};
 try { manual = JSON.parse(localStorage.getItem(storageKey)) ?? {}; } catch { /* unavailable or invalid storage */ }
-let trades = [], imported = false, sort = 'gain', generation = 0, pending = 0;
+let trades = [], imported = false, sort = 'value', generation = 0, pending = 0;
 let market = new Map(), details = new Map();
 let editing = null;
 
@@ -171,12 +171,19 @@ function dividendsPage(groups, dividends) {
     <p class="muted">対象期末の保有株数に基づく税引前の推計です。 ${note}</p>
     ${table(['銘柄','対象期末','1株配当','対象株数','推計受取額','出典'],rows.map(r => [stockLink(r.code),r.date,yen(r.amount),digits.format(r.shares),yen(r.total),r.manual ? '手入力' : 'Yahoo!ファイナンス']))}</section>`;
 }
-function stockPage(code, lots, rows) {
+function stockPage(code, lots, rows, holding) {
   const data = market.get(code), detail = details.get(code);
   const total = dividendTotal(new Map([[code,lots]]), rows.filter(r => r.shares > 0));
   const source = data?.source || `https://finance.yahoo.co.jp/quote/${code}.T`;
   const record = editing?.code === code ? editing : null;
-  return `<div class="detail-grid">
+  return `<section aria-label="現在の評価損益">
+    ${holding ? `<div class="detail-grid">
+      <div class="metric"><span>現在の評価損益</span><b class="${tone(holding.gain)}">${yen(holding.gain)}</b><small>上昇率 ${percent(holding.rate)}</small></div>
+      <div class="metric"><span>評価額</span><b>${yen(holding.value)}</b><small>保有株数 ${digits.format(holding.shares)} 株</small></div>
+      <div class="metric"><span>取得金額</span><b>${yen(holding.cost)}</b></div>
+    </div>` : '<p class="notice muted">現在の保有株はありません。</p>'}
+  </section>
+  <div class="detail-grid">
     <div class="metric"><span>株価</span><b>${yen(data?.price)}</b><small>Yahoo!ファイナンス表示時点 ${esc(data?.asOf || '—')}</small></div>
     <div class="metric"><span>累計受取配当（推計）</span><b>${yen(total)}</b><small>${data?.historyIncomplete !== false ? '公開配当履歴に未取得分があります' : '税引前'}</small></div>
     <div class="metric"><span>年間予想1株配当</span><b>${yen(data?.forecast)}</b><small>会社予想</small></div>
@@ -218,7 +225,7 @@ function render() {
   const heading = knownStock ? stockName(code) : label[page];
   view.innerHTML = `<div class="heading"><h1>${esc(heading)} ${knownStock && heading !== code ? `<small>${code}</small>` : ''}</h1>
     ${pending ? `<span class="muted" role="status">市場データ取得中（残り ${pending} 銘柄）</span>` : ''}</div>`;
-  if (knownStock) view.insertAdjacentHTML('beforeend', stockPage(code,model.groups.get(code),model.dividends.get(code)));
+  if (knownStock) view.insertAdjacentHTML('beforeend', stockPage(code,model.groups.get(code),model.dividends.get(code),model.holdings.find(holding => holding.code === code)));
   else if (page === 'home') view.insertAdjacentHTML('beforeend', home(model));
   else if (page === 'sales') view.insertAdjacentHTML('beforeend', salesPage(model.sold));
   else if (page === 'dividends') view.insertAdjacentHTML('beforeend', dividendsPage(model.groups,model.dividends));
