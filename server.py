@@ -14,6 +14,7 @@ from time import monotonic
 from urllib.error import URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
+import webbrowser
 
 ROOT = Path(__file__).resolve().parent / "web"
 YAHOO = "https://finance.yahoo.co.jp/quote/"
@@ -171,9 +172,15 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     parser.add_argument("--host", choices=["127.0.0.1"], default="127.0.0.1")
     parser.add_argument("--strictPort", action="store_true", help=argparse.SUPPRESS)
-    port = parser.parse_args().port
+    parser.add_argument("--open", action="store_true", help="open the app in the default browser")
+    args = parser.parse_args()
+    port = args.port
     with ThreadingHTTPServer(("127.0.0.1", port), partial(Handler, directory=str(ROOT))) as server:
-        print(f"http://127.0.0.1:{port}/", flush=True)
+        address, bound_port = server.server_address
+        url = f"http://{address}:{bound_port}/"
+        print(url, flush=True)
+        if args.open:
+            webbrowser.open(url)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
